@@ -1,0 +1,270 @@
+#!/bin/csh -f
+
+####################################################################################
+## Copyright (c) 2014, University of British Columbia (UBC)  All rights reserved. ##
+##                                                                                ##
+## Redistribution  and  use  in  source   and  binary  forms,   with  or  without ##
+## modification,  are permitted  provided that  the following conditions are met: ##
+##   * Redistributions   of  source   code  must  retain   the   above  copyright ##
+##     notice,  this   list   of   conditions   and   the  following  disclaimer. ##
+##   * Redistributions  in  binary  form  must  reproduce  the  above   copyright ##
+##     notice, this  list  of  conditions  and the  following  disclaimer in  the ##
+##     documentation and/or  other  materials  provided  with  the  distribution. ##
+##   * Neither the name of the University of British Columbia (UBC) nor the names ##
+##     of   its   contributors  may  be  used  to  endorse  or   promote products ##
+##     derived from  this  software without  specific  prior  written permission. ##
+##                                                                                ##
+## THIS  SOFTWARE IS  PROVIDED  BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" ##
+## AND  ANY EXPRESS  OR IMPLIED WARRANTIES,  INCLUDING,  BUT NOT LIMITED TO,  THE ##
+## IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE ##
+## DISCLAIMED.  IN NO  EVENT SHALL University of British Columbia (UBC) BE LIABLE ##
+## FOR ANY DIRECT,  INDIRECT,  INCIDENTAL,  SPECIAL,  EXEMPLARY, OR CONSEQUENTIAL ##
+## DAMAGES  (INCLUDING,  BUT NOT LIMITED TO,  PROCUREMENT OF  SUBSTITUTE GOODS OR ##
+## SERVICES;  LOSS OF USE,  DATA,  OR PROFITS;  OR BUSINESS INTERRUPTION) HOWEVER ##
+## CAUSED AND ON ANY THEORY OF LIABILITY,  WHETHER IN CONTRACT, STRICT LIABILITY, ##
+## OR TORT  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE ##
+## OF  THIS SOFTWARE,  EVEN  IF  ADVISED  OF  THE  POSSIBILITY  OF  SUCH  DAMAGE. ##
+####################################################################################
+
+####################################################################################
+##                     Run-in-batch Simulation Flow Manager                       ##
+##                                                                                ##
+##   Author: Ameer M.S. Abdelhadi (ameer@ece.ubc.ca, ameer.abdelhadi@gmail.com)   ##
+##   Switched SRAM-based Multi-ported RAM; University of British Columbia, 2014   ##
+####################################################################################
+
+####################################################################################
+## USAGE:                                                                         ##
+##   ./sim <Depth List> <Width List> <#Write Ports List (Fixed-Switched)> \       ##
+##         <#Read Ports List (Fixed-Switched)> <Bypass List> <#Cycles> [verbose]  ##
+##                                                                                ##
+## - Use a comma delimited list.                                                  ##
+##   - No spaces.                                                                 ##
+##   - May be surrounded by any brackets (), [], {}, or <>.                       ##
+## - RAM depth, data width, and simulation cycles are positive integers.          ##
+## - Numbers of read and write ports are:                                         ##
+##   - Pairs of "fixed-switched" port numbers delimited with hyphen "-", or,      ##
+##   - Fixed port number only, if switched ports are not required.                ##
+##   * numbers of read/write ports are integers.                                  ##
+##   * #switched_read_ports  < =  #fixed_read_ports                               ##
+## - Bypassing type is one of: NON, WAW, RAW, or RDW.                             ##
+##   - NON: No bypassing logic                                                    ##
+##   - WAW: Allow Write-After-Write                                               ##
+##   - RAW: new data for Read-after-Write                                         ##
+##   - RDW: new data for Read-During-Write                                        ##
+## - "verbose" is an optional argument; use if verbosed logging is required       ##
+##                                                                                ##
+## EXAMPLES:                                                                      ##
+## ./sim 1024 32 1-2 2-2 NON 1000000 verbose                                      ##
+##    Simulate 1M cycles of a 1K lines RAM, 32 bits width, 1 fixed / 2 switched   ##
+##    write & 2 fixed / 2 switched read ports, no bypassing, verbose logging,     ##
+## ./sim 512,1024 8,16,32 2,3,4 1,2,3,4 RAW 1000000                               ##
+##    Simulate 1M cycles of RAMs with 512 or 1024 lines, 8, 16, or 32 bits width, ##
+##    2,3, or 4 fixed write ports, 1,2,3, or 4 fixed read ports, with RAW bypass. ##
+##                                                                                ##
+## The following files and directories will be created after simulation :         ##
+##   - sim.res : A list of simulation results, each run in a separate line,       ##
+##               including all design styles.                                     ##
+####################################################################################
+
+# setup environment variables and Altera's CAD tools 
+# add your own flow (after the last `else`) if necessary 
+if (`hostname -d` == "ece.ubc.ca") then
+  printf "Setup Altera CAD flow from The University of BC...\n"
+  source ./altera.13.1.ubc.csh
+else if (`hostname -d` == "fabric.tacc.utexas.edu") then
+  printf "Setup Altera CAD flow from FAbRIC/TACC - UT Austin...\n"
+  source ./altera.14.0.fab.csh
+else
+    ## --> for other CAD environment, setup your flow here <--
+    printf '\x1b[%i;3%im' 1 1
+    printf 'Error: Altera CAD flow environment is not defined.\n'
+    printf '       Define your flow in ./sim.\n'
+    printf '       Exiting...\n'
+    printf '\x1b[0m'
+    exit
+endif
+
+# require exactly 6 arguments
+if ( (${#argv} != 6) & (${#argv} != 7) ) then
+    printf '\x1b[%i;3%im' 1 1
+    printf 'Error: Exactly 6 or 7 arguments are required\n'
+    printf '\x1b[0m'
+    goto errorMessage
+endif
+
+# convert each argument list into a c-shell list (romove commas and etc.)
+
+set MDLST = (`echo ${argv[1]} | tr ",()[]{}<>" " "`)
+set DWLST = (`echo ${argv[2]} | tr ",()[]{}<>" " "`)
+set WPLST = (`echo ${argv[3]} | tr ",()[]{}<>" " "`)
+set RPLST = (`echo ${argv[4]} | tr ",()[]{}<>" " "`)
+set BYLST = (`echo ${argv[5]} | tr ",()[]{}<>" " "`)
+set CYCC  = ${argv[6]}
+
+# check if verbose is required
+set VERB = 0
+if ( ${#argv} == 7 ) then
+  if ( (${argv[7]} == "verbose") | (${argv[7]} == "verb") | (${argv[7]} == "v")) then
+    set VERB = 1
+  else
+    printf '\x1b[%i;3%im' 1 1
+    printf "Error: Check arguments syntax\n"
+    printf '\x1b[0m'
+    goto errorMessage
+  endif
+endif
+
+# check arguments correctness (positive integer numbers)
+foreach ARGVAL ($MDLST $DWLST $CYCC)
+  set ARGVALIsNumber=`echo $ARGVAL | egrep -c '^[0-9]+$'`
+  if ($ARGVALIsNumber != 1) then
+    printf '\x1b[%i;3%im' 1 1
+    printf "Error (${ARGVAL}): Memory depth, data width, and number of simulation cycles arguments must be possitive integer numbers\n"
+    printf '\x1b[0m'
+    goto errorMessage
+  endif
+end
+
+# check arguments correctness (positive integer numbers)
+foreach ARGVAL ($WPLST $RPLST)
+  set ARGVALIsNumber_=`echo $ARGVAL | egrep -c '^[0-9]+(\-[0-9])?[0-9]*$'`
+  if ($ARGVALIsNumber_ != 1) then
+    printf '\x1b[%i;3%im' 1 1
+    echo 'Error: The number of reading and writing ports must be possitive integer numbers'
+    echo '       Use "-" to seperate normal from extended mode parameters'
+    goto errorMessage
+  endif
+end
+
+# check bypass list argument correctness
+foreach BYVAL ($BYLST)
+  if ( ($BYVAL != "NON") & ($BYVAL != "WAW") & ($BYVAL != "RAW") & ($BYVAL != "RDW") ) then
+    printf '\x1b[%i;3%im' 1 1
+    printf "Error (${BYVAL}): Bypass list must be a list of NON, WAW, RAW, or RDW\b\n"
+    printf '\x1b[0m'
+    goto errorMessage
+  endif
+end
+
+# total different designs
+@ FlowOprNum = ((${#MDLST})*(${#DWLST})*(${#WPLST})*(${#RPLST})*(${#BYLST}))
+@ FlowOprCnt = 0
+
+printf '\x1b[%i;3%im' 7 4
+printf "= Simulate in batch with the following parameters:\n"
+printf "= Memory depth                : $MDLST\n"
+printf "= Data width                  : $DWLST\n"
+printf "= Write ports (fixed-switched): $WPLST\n"
+printf "= Read  ports (fixed-switched): $RPLST\n"
+printf "= Bypass type                 : $BYLST\n"
+printf "= Simulation cycles           : $CYCC\n"
+printf '\x1b[0m'
+
+# create work if not exist
+if !(-d work) vlib work
+
+# operate on all different RAM parameters
+  foreach CURMD ($MDLST)
+    foreach CURDW ($DWLST)
+      foreach CURWP ($WPLST)
+
+        # extract fixed and switched parameters
+        set CURWPF = `echo $CURWP|cut -d"-" -f1`
+        set CURWPS = `echo $CURWP|cut -d"-" -f2`
+        if (`echo $CURWP|grep "-"` == "") set CURWPS = 0
+
+         foreach CURRP ($RPLST)
+
+          # extract fixed and switched parameters
+          set CURRPF = `echo $CURRP|cut -d"-" -f1`
+          set CURRPS = `echo $CURRP|cut -d"-" -f2`
+          if (`echo $CURRP|grep "-"` == "") set CURRPS = 0
+
+          foreach CURBY ($BYLST)
+            @ FlowOprCnt++
+
+            # print header
+            printf '\x1b[%i;3%im' 7 2
+            printf "\n== Starting Simulation (${FlowOprCnt}/${FlowOprNum}): [Depth:${CURMD}; Width:${CURDW}; Write(fixed-switched):${CURWPF}-${CURWPS}; Read(fixed-switched):${CURRPF}-${CURRPS}; Bypass:${CURBY}; Cycles:${CYCC}]\n"
+            printf '\x1b[0m'
+
+            # check if number of total write ports is possitive
+            if ( ($CURWPF == 0) & ($CURWPS == 0) )then
+              printf '\x1b[%i;3%im' 1 1
+              echo 'Error: number of total write ports must be possitive; skipping current...'
+              printf '\x1b[0m'
+            # check if number of fixed read ports is possitive
+            else if ($CURRPF == 0) then
+              printf '\x1b[%i;3%im' 1 1
+              echo 'Error: number of fixed read ports must be possitive; skipping current run...'
+              printf '\x1b[0m'
+            # check if number of switched read ports is smaller than number of fixed read ports
+            else if ($CURRPF < $CURRPS) then
+              printf '\x1b[%i;3%im' 1 1
+              echo 'Error: number of switched read ports must be smaller than number of fixed read ports; skipping current run...'
+              printf '\x1b[0m'
+            else
+              # remove work directory to recompile verilog
+              if (-d work) \rm -rf work
+              # recreate work directory
+              vlib work
+              # run current simulation
+              vlog -work work +define+SIM+ARCH=\"\"+MEMD=$CURMD+DATW=$CURDW+nWPF=$CURWPF+nRPF=$CURRPF+nWPS=$CURWPS+nRPS=$CURRPS+BYPS=\"${CURBY}\"+VERB=$VERB+CYCC=$CYCC dpram.v lvt_bin.v mpram_lvt.v mpram_reg.v smpram.v mpram_xor.v utils.vh lvt_1ht.v lvt_reg.v smpram_tb.v mrram.v mrram_swt.v dpram_bbs.v
+              vsim -c -L altera_mf_ver -L lpm_ver -do "run -all" smpram_tb
+            endif
+
+            # print footer
+            printf '\x1b[%i;3%im' 7 2
+            printf "== Simulation (${FlowOprCnt}/${FlowOprNum}) Completed: [Depth:${CURMD}; Width:${CURDW}; write(fixed-switched):${CURWPF}-${CURWPS}; read(fixed-switched):${CURRPF}-${CURRPS}; Bypass:${CURBY}; Cycles:${CYCC}]\n"
+            printf '\x1b[0m'
+
+      end
+    end
+  end
+end
+
+# clean unrequired files / after run
+if (-d work        ) \rm -rf work
+if (-e transcript  ) \rm -f  transcript
+if (-e init_ram.hex) \rm -f init_ram.hex
+if (-e init_ram.mif) \rm -f init_ram.mif
+
+exit
+
+# error message
+errorMessage:
+printf '\x1b[%i;3%im' 1 1
+cat << EOH
+Switched SRAM-based Multi-ported Memory - Run-in-batch Simulation Flow Manager
+USAGE:
+  ./sim <Depth List> <Width List> <#Write Ports List (Fixed-Switched)> \
+        <#Read Ports List (Fixed-Switched)> <Bypass List> <#Cycles> [verbose]
+- Use a comma delimited list.
+  - No spaces.
+  - May be surrounded by any brackets (), [], {}, or <>.
+- RAM depth, data width, and simulation cycles are positive integers.
+- Numbers of read and write ports are:
+  - Pairs of "fixed-switched" port numbers delimited with hyphen "-", or,
+  - Fixed port number only, if switched ports are not required.
+  * numbers of read/write ports are integers.
+  * #switched_read_ports  < =  #fixed_read_ports
+- Bypassing type is one of: NON, WAW, RAW, or RDW.
+  - NON: No bypassing logic
+  - WAW: Allow Write-After-Write
+  - RAW: new data for Read-after-Write
+  - RDW: new data for Read-During-Write
+- "verbose" is an optional argument; use if verbosed logging is required
+EXAMPLES:
+./sim 1024 32 1-2 2-2 NON 1000000 verbose
+   Simulate 1M cycles of a 1K lines RAM, 32 bits width, 1 fixed / 2 switched
+   write & 2 fixed / 2 switched read ports, no bypassing, verbose logging,
+./sim 512,1024 8,16,32 2,3,4 1,2,3,4 RAW 1000000
+   Simulate 1M cycles of RAMs with 512 or 1024 lines, 8, 16, or 32 bits width,
+   2,3, or 4 fixed write ports, 1,2,3, or 4 fixed read ports, with RAW bypass.
+The following files and directories will be created after simulation :
+  - sim.res : A list of simulation results, each run in a separate line,
+              including all design styles.
+EOH
+printf '\x1b[0m'
+

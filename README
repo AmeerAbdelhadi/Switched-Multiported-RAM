@@ -1,0 +1,234 @@
+####################################################################################
+   Copyright (c) 2014, University of British Columbia (UBC)  All rights reserved.   
+                                                                                    
+   Redistribution  and  use  in  source   and  binary  forms,   with  or  without   
+   modification,  are permitted  provided that  the following conditions are met:   
+     * Redistributions   of  source   code  must  retain   the   above  copyright   
+       notice,  this   list   of   conditions   and   the  following  disclaimer.   
+     * Redistributions  in  binary  form  must  reproduce  the  above   copyright   
+       notice, this  list  of  conditions  and the  following  disclaimer in  the   
+       documentation and/or  other  materials  provided  with  the  distribution.   
+     * Neither the name of the University of British Columbia (UBC) nor the names   
+       of   its   contributors  may  be  used  to  endorse  or   promote products   
+       derived from  this  software without  specific  prior  written permission.   
+                                                                                    
+   THIS  SOFTWARE IS  PROVIDED  BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"   
+   AND  ANY EXPRESS  OR IMPLIED WARRANTIES,  INCLUDING,  BUT NOT LIMITED TO,  THE   
+   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE   
+   DISCLAIMED.  IN NO  EVENT SHALL University of British Columbia (UBC) BE LIABLE   
+   FOR ANY DIRECT,  INDIRECT,  INCIDENTAL,  SPECIAL,  EXEMPLARY, OR CONSEQUENTIAL   
+   DAMAGES  (INCLUDING,  BUT NOT LIMITED TO,  PROCUREMENT OF  SUBSTITUTE GOODS OR   
+   SERVICES;  LOSS OF USE,  DATA,  OR PROFITS;  OR BUSINESS INTERRUPTION) HOWEVER   
+   CAUSED AND ON ANY THEORY OF LIABILITY,  WHETHER IN CONTRACT, STRICT LIABILITY,   
+   OR TORT  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE   
+   OF  THIS SOFTWARE,  EVEN  IF  ADVISED  OF  THE  POSSIBILITY  OF  SUCH  DAMAGE.   
+####################################################################################
+
+####################################################################################
+     Switched SRAM-based Multi-ported RAM; University of British Columbia, 2014
+     Author: Ameer M.S. Abdelhadi (ameer@ece.ubc.ca, ameer.abdelhadi@gmail.com)
+
+     A fully parameterized and generic Verilog implementation of the suggested
+     modular switched multi-ported SRAM-based memory, together  with  previous
+     approaches  are  provided  as  open  source hardware. A run-in-batch flow
+     manager  to  simulate  and  synthesize  various  designs   with   various
+     parameters in batch using Altera's ModelSim and Quartus is also provided.
+
+           LICENSE: BSD 3-Clause ("BSD New" or "BSD Simplified") license.
+####################################################################################
+
+####################################################################################
+         This  package  is  part  of  a  journal  paper  submission  for :
+         ACM Transactions on Reconfigurable Technology and Systems (TRETS)
+         Special Issue on  Reconfigurable  Components  with  Source  Code.
+
+           Paper title:  Modular Switched Multi-ported SRAM-based Memory
+           Authors:  Ameer M. S. Abdelhadi and Guy G. F. Lemieux  -  UBC
+####################################################################################
+
+####################################################################################
+   CAD Tools Requirements:
+   =======================
+   This project has been tested intensively using Altera's Design Suite version 14.0
+   Specifically:
+   1) Quartus II version 14.0 has been used to synthesize the Verilog implementation
+   2) ModelSim Altera Edition version 10.0d (modelsim_ase) has been used to simulate
+      the Verilog implementation.
+   
+   Furthermore, the run-in-batch synthesis and simulation flow managers have been
+   implemented using C-Shell, hence a /bin/csh should be available in the machine
+####################################################################################
+
+####################################################################################
+   Files and directories in this package:
+   ======================================
+   - README             : This file!
+   - LICENSE            : BSD 3-Clause ("BSD New" or "BSD Simplified") license.
+   - altera.12.0.ubc.csh: C-shell script: Setup environment variables and Altera 12.0
+                          CAD flow from The University of British Columbia (UBC).
+                          Change parameters to your environment if required.
+   - altera.13.1.ubc.csh: C-shell script: Setup environment variables and Altera 13.1
+                          CAD flow from The University of British Columbia (UBC).
+   - altera.14.0.ubc.csh: C-shell script: Setup environment variables and Altera 14.0
+                          CAD flow from The University of British Columbia (UBC).
+   - altera.14.0.fab.csh: C-shell script: Setup environment variables and Altera 14.0
+                          CAD flow from FAbRIC (FPGA Research Infrastructure Cloud);
+                          Texas Advanced Computing Center (TACC); UT Austin
+                          https://wikis.utexas.edu/display/fabric/Home
+   - sim                : C-shell script: A run-in-batch simulation flow manager .
+   - syn                : C-shell script: A run-in-batch synthesis  flow manager.
+   - config.vh          : Verilog: Generated by 'syn', contains design parameters.
+   - utils.vh           : Verilog: Design pre-compile utilities.
+   - mrram.v            : Verilog: Multiread-RAM based on bank replication using
+                                   generic dual-ported RAM with optional single-stage
+                                   or two-stage bypass/ for normal mode ports.
+   - mrram_swt.v        : Verilog: Multiread-RAM based on bank replication using
+                                   generic dual-ported RAM with optional single-stage
+                                   or two-stage bypass and switched read ports support.
+   - dpram.v            : Verilog: Generic dual-ported RAM .
+   - dpram_bbs.v        : Verilog: Generic dual-ported RAM with optional single-stage
+                                   or two-stage bypass.
+   - mpram_reg.v        : Verilog: Generic register-based multiported-RAM. Reading
+                                   addresses are registered and old data will be read
+                                   in case of RAW. Implemented in FF's if the number
+                                   of reading or writing ports exceeds one.
+   - mpram_xor.v        : Verilog: Multiported-RAM based on XOR implementation.
+   - lvt_reg.v          : Verilog: Register-based binary-coded LVT (Live-Value-Table).
+   - lvt_bin.v          : Verilog: Binary-coded I-LVT (Invalidation Live-Value-Table).
+   - lvt_1ht.v          : Verilog: Onehot-coded I-LVT (Invalidation Live-Value-Table).
+   - mpram_lvt.v        : Verilog: LVT/I-LVT-based Multiported-RAM for register-base
+                                   and SRAM-based one-hot/binary-coded I-LVT.
+   - smpram.v           : Verilog: Switched multiported-RAM: register-based, XOR-based
+                                   ,register-based LVT, SRAM-based binary-coded and
+                                   one-hot-coded I-LVT.
+   - smpram_tb.v        : Verilog: Switched multiported-RAM testbench.
+   - smpram.qpf         : Quartus II Project File.
+   - smpram.qsf         : Quartus II Settings File.
+   - sim.res            : A list of simulation results, each run in a separate line,
+                          including all architectures.
+   - syn.res            : A list of synthesis results, each run in a separate line,
+                          including: frequency, resources usage, and runtime.
+   - log/               : A directory containing Altera's logs and reports.
+   - syn.res.example    : Example synthesis  results.
+   - sim.res.example    : Example simulation results.
+   - log.example.tar.xz : xz tarball: archived log directory example
+                          (for the runs listed in syn.res.example).
+                          To extract invoke: tar -xavf log.example.tar.xz
+####################################################################################
+
+####################################################################################
+   Switched multi-ported RAM module instantiation:
+   ===============================================
+
+   All *.v & *.vh files in this package should be copied into your work directory.
+   Copy the following instantiation into your Verilog design, change parameters and
+   connectivity to fit your design.
+
+   // instantiate a multiported-RAM
+   mpram #(
+     // parameters
+     .MEMD (MEMD ), // positive integer: memory depth
+     .DATW (DATW ), // positive integer: data width
+     .nRPF (nRPF ), // positive integer: # fixed    read  ports (nRPF>=1              )
+     .nWPF (nWPF ), // positive integer: # fixed    write ports (nWPF>=0              )
+     .nRPS (nRPS ), // positive integer: # switched read  ports (nRPS<=nRPF           )
+     .nWPS (nWPS ), // positive integer: # switched write ports (nWPS>=0; nWPF+nWPS>=1)
+     .ARCH (ARCH ), // string: multi-port RAM architecture:
+                    //   "AUTO"  : Choose automatically
+                    //   "REG"   : Register-based
+                    //   "XOR"   : XOR-based
+                    //   "LVTREG": Register-based LVT
+                    //   "LVTBIN": Binary-coded I-LVT-based
+                    //   "LVT1HT": Onehot-coded I-LVT-based
+     .BYPS (BYPS ), // string: Bypassing type:
+                    //   "WAW": Allow Write-After-Write
+                    //   "RAW": New data for Read-after-Write
+                    //   "RDW": New data for Read-During-Write
+     .FILE (""  )   // text: initialization file, optional
+   ) mpram_inst (
+     // ports
+     .clk  (clk  ), // clock                                                          - input 
+     .rdWr (rdWr ), // switch read/write (write is active low)                        - input 
+     // the following ports are packed from nWPF fixed & nWPS switched ports
+     .WEnb (WEnb ), // write enables   - input : [            (nWPF+nWPS)-1:0]
+     .WAddr(WAddr), // write addresses - input : [`log2(MEMD)*(nWPF+nWPS)-1:0]
+     .WData(WData), // write data      - input : [DATW       *(nWPF+nWPS)-1:0]
+     .RAddr(RAddr), // read  addresses - input : [`log2(MEMD)*(nRPF+nRPS)-1:0]
+     .RData(RData)  // read  data      - output: [DATW       *(nRPF+nRPS)-1:0]
+   );
+####################################################################################
+
+####################################################################################
+   `sim`: A Run-in-batch Simulation Flow Manager
+   =============================================
+   USAGE:
+     ./sim <Depth List> <Width List> <#Write Ports List (Fixed-Switched)> \
+           <#Read Ports List (Fixed-Switched)> <Bypass List> <#Cycles> [verbose]
+
+   - Use a comma delimited list.
+     - No spaces.
+     - May be surrounded by any brackets (), [], {}, or <>.
+   - RAM depth, data width, and simulation cycles are positive integers.
+   - Numbers of read and write ports are:
+     - Pairs of "fixed-switched" port numbers delimited with hyphen "-", or,
+     - Fixed port number only, if switched ports are not required.
+     * numbers of read/write ports are integers.
+     * #switched_read_ports  < =  #fixed_read_ports
+   - Bypassing type is one of: NON, WAW, RAW, or RDW.
+     - NON: No bypassing logic
+     - WAW: Allow Write-After-Write
+     - RAW: new data for Read-after-Write
+     - RDW: new data for Read-During-Write
+   - "verbose" is an optional argument; use if verbosed logging is required
+
+   EXAMPLES:
+   ./sim 1024 32 1-2 2-2 NON 1000000 verbose
+      Simulate 1M cycles of a 1K lines RAM, 32 bits width, 1 fixed / 2 switched
+      write & 2 fixed / 2 switched read ports, no bypassing, verbose logging,
+   ./sim 512,1024 8,16,32 2,3,4 1,2,3,4 RAW 1000000
+      Simulate 1M cycles of RAMs with 512 or 1024 lines, 8, 16, or 32 bits width,
+      2,3, or 4 fixed write ports, 1,2,3, or 4 fixed read ports, with RAW bypass.
+
+   The following files and directories will be created after simulation :
+     - sim.res : A list of simulation results, each run in a separate line,
+                 including all design styles.                           
+####################################################################################
+
+####################################################################################
+   syn: A Run-in-batch Synthesis Flow Manager
+   ==========================================
+   USAGE:
+     ./syn <Depth List> <Width List> <#Write Ports List (Fixed-Switched)> \
+           <#Read Ports List (Fixed-Switched)> <Bypass List> <Architecture List>
+   - Use a comma delimited list.
+     - No spaces.
+     - May be surrounded by any brackets (), [], {}, or <>.
+   - RAM depth, data width, and simulation cycles are positive integers.
+   - Numbers of read and write ports are:
+     - Pairs of "fixed-switched" port numbers delimited with hyphen "-", or,
+     - Fixed port number only, if switched ports are not required.
+     * numbers of read/write ports are integers.
+     * #switched_read_ports  < =  #fixed_read_ports
+   - Bypassing type is one of: NON, WAW, RAW, or RDW.
+     - NON: No bypassing logic
+     - WAW: Allow Write-After-Write
+     - RAW: new data for Read-after-Write
+     - RDW: new data for Read-During-Write
+   - Architecture is one of: REG, XOR, LVTREG, LVTBIN, or LVT1HT.
+     - REG   : Register-based multi-ported RAM
+     - XOR   : XOR-based multi-ported RAM
+     - LVTREG: Register-based LVT multi-ported RAM
+     - LVTBIN: Binary-coded I-LVT-based multi-ported RAM
+     - LVT1HT: Onehot-coded I-LVT-based multi-ported RAM
+   EXAMPLES:
+   ./syn 1024 32 1-2 2-2 NON XOR
+      Synthesis a XOR-based RAM with no bypassing, 1K lines RAM, 32 bits width,
+      1 fixed / 2 switched write and 2 fixed / 2 switched read ports.
+   ./syn 512,1024 16,32 3,4 2,3 RAW,RDW LVTBIN,LVT1HT
+      Synthesis LVTBIN & LVT1HT RAM with new data RAW & RDW bypassing, 512 & 1024
+      lines, 16 & 32 data width, 3 & 4 fixed write ports, 2 & 3 fixed read ports.
+   The following files and directories will be created after compilation:
+     - syn.res : A list of results, each run in a separate line, including:
+                 frequency, resources usage, and runtime
+     - log/    : Altera's logs and reports
+####################################################################################
