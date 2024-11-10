@@ -7,12 +7,11 @@ A fully parameterized and generic Verilog implementation of the suggested modula
 
 **LICENSE:** BSD 3-Clause ("BSD New" or "BSD Simplified") license.
 
-This package is part of a journal paper submission to:  
-**ACM Transactions on Reconfigurable Technology and Systems (TRETS); Special Issue on Reconfigurable Components with Source Code.**
-  * **Paper title:** Modular Switched Multi-ported SRAM-based Memory
-  * **Authors**: Ameer M.S. Abdelhadi and Guy G.F. Lemieux - UBC
+Please refer to the full paper for more information:
 
-
+**A. M.S. Abdelhadi and G. G.F. Lemieux, "Modular Switched Multi-ported SRAM-based Memories," ACM Transactions on Reconfigurable Technology and Systems (TRETS) Special Issue on Reconfigurable Components with Source Code, accepted in Jul. 2015. 27 pages. (Invited)**
+* **DOI:** https://doi.org/10.1145/2851506
+* **Paper:** https://www.ece.mcmaster.ca/~ameer/publications/Abdelhadi-Journal-2015Jul-TRETSCode2014-SwitchedMultiportedRAM.pdf
 ---
 
 
